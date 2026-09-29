@@ -1,0 +1,22 @@
+rotate_cw: 0
+flip_x: false
+flip_y: false
+
+n_sensors: 5
+sensor_x_frac: 0.20
+sensor_width_frac: 0.10
+sensor_min_fill: 0.02
+
+k_y: 1.50
+k_ang: 1.00
+v_fwd: 0.25
+v_min: 0.05
+ang_limit: 0.6
+lin_limit: 0.4
+slowdown_angle: 0.8
+
+invert_y_error: false
+invert_ang_error: false
+
+min_pipe_area_px: 1500
+search_omega: 0.25
