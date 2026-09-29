@@ -4,7 +4,7 @@ Vision + control for the following the path... detect the orange
 marker on the pool floor with the bottom camera, measure how far we're off its
 axis, n steer to stay on it.
 
-Slight, loose inspirtation from ITU AUV (itu-auv/auv-software).
+Slight, loose inspiration from ITU AUV (itu-auv/auv-software).
 ## Files
 
 
@@ -21,13 +21,13 @@ Sure thing! heres a table formatted in markdown!
 | `testdetect.py` | quick script to eyeball the detector on an image |
 | `test.png`, `test1.png` | sample images for testing |
 
-## Run the detector test (inside the repo's venv)
+## Run the detector test 
 
 ```bash
 cd path_following
 python testdetect.py
 ```
-
+BTW I accidentally removed all comments from some files ill add them back later mb
 ## next
 
 - Tune `PipeDetectorConfig` against real pool footage
