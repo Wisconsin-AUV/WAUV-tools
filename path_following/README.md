@@ -4,6 +4,9 @@ Vision + control for the following the path... detect the orange
 marker on the pool floor with the bottom camera, measure how far we're off its
 axis, n steer to stay on it.
 
+UPDATE:
+We now filter by orange instead of grayscale darkest colors. Thats about it
+
 Slight, loose inspiration from ITU AUV (itu-auv/auv-software).
 ## Files
 
