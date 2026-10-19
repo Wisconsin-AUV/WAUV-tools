@@ -1,12 +1,17 @@
+# Starting values for the follower settings (same as PipeFollowerConfig in pipe_follower.py)
+
+# image orientation, set to match the camera mount
 rotate_cw: 0
 flip_x: false
 flip_y: false
 
+# strips used to measure sideways offset
 n_sensors: 5
 sensor_x_frac: 0.20
 sensor_width_frac: 0.10
 sensor_min_fill: 0.02
 
+# steering gains and speed limits
 k_y: 1.50
 k_ang: 1.00
 v_fwd: 0.25
@@ -15,8 +20,10 @@ ang_limit: 0.6
 lin_limit: 0.4
 slowdown_angle: 0.8
 
+# flip these if it steers the wrong way
 invert_y_error: false
 invert_ang_error: false
 
+# marker detection and search
 min_pipe_area_px: 1500
 search_omega: 0.25

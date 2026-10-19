@@ -1,13 +1,18 @@
+# Turns the marker mask into steering: a forward speed and a turn rate.
+# Adapted from itu-auv/auv-software (BSD-3-Clause).
+
 import math
 import numpy as np
 import cv2
 from dataclasses import dataclass
 
 
+# keep a value between lo and hi
 def saturate(x, lo, hi):
     return max(lo, min(hi, x))
 
 
+# rotate an image by n quarter turns clockwise
 def rot90n(img, n_cw):
     n_cw = int(n_cw) % 4
     if n_cw == 0:
@@ -20,35 +25,38 @@ def rot90n(img, n_cw):
         return np.ascontiguousarray(np.rot90(img, k=1))
 
 
+# Tunable settings for the follower
 @dataclass
 class PipeFollowerConfig:
-    rotate_cw: int = 0
-    flip_x: bool = False
-    flip_y: bool = False
-    n_sensors: int = 5
-    sensor_x_frac: float = 0.20
-    sensor_width_frac: float = 0.10
-    sensor_min_fill: float = 0.02
-    k_y: float = 1.50
-    k_ang: float = 1.00
-    v_fwd: float = 0.25
-    v_min: float = 0.05
-    ang_limit: float = 0.6
-    lin_limit: float = 0.4
-    slowdown_angle: float = 0.8
-    invert_y_error: bool = False
-    invert_ang_error: bool = False
-    min_pipe_area_px: int = 1500
-    search_omega: float = 0.25
+    rotate_cw: int = 0               # rotate the image to match how the camera is mounted
+    flip_x: bool = False             # mirror left/right
+    flip_y: bool = False             # mirror up/down
+    n_sensors: int = 5               # number of strips used to find sideways offset
+    sensor_x_frac: float = 0.20      # where the strips sit across the image (0 to 1)
+    sensor_width_frac: float = 0.10  # how wide the strips are
+    sensor_min_fill: float = 0.02    # strip must be at least this full to count
+    k_y: float = 1.50                # how hard to correct sideways offset
+    k_ang: float = 1.00              # how hard to correct the angle
+    v_fwd: float = 0.25              # normal forward speed (m/s)
+    v_min: float = 0.05              # slowest forward speed
+    ang_limit: float = 0.6           # max turn rate (rad/s)
+    lin_limit: float = 0.4           # max forward speed (m/s)
+    slowdown_angle: float = 0.8      # slow down more when the angle is off
+    invert_y_error: bool = False     # flip sign if it steers the wrong way
+    invert_ang_error: bool = False   # flip sign if it turns the wrong way
+    min_pipe_area_px: int = 1500     # marker counts as seen above this many pixels
+    search_omega: float = 0.25       # turn rate while looking for the marker
 
 
 class PipeLineFollower(object):
     def __init__(self, cfg=PipeFollowerConfig()):
         self.p = cfg
 
+    # Takes the mask, returns (forward speed, turn rate, debug info)
     def compute_cmd(self, mask):
         p = self.p
 
+        # line the image up with how the camera is mounted
         if p.rotate_cw:
             mask = rot90n(mask, p.rotate_cw)
         if p.flip_x:
@@ -58,12 +66,14 @@ class PipeLineFollower(object):
 
         h, w = mask.shape[:2]
 
+        # no marker in view: stop moving forward and spin to look for it
         pipe_area = int(np.count_nonzero(mask))
         have_pipe = pipe_area >= p.min_pipe_area_px
         if not have_pipe:
             w_z = saturate(p.search_omega, -p.ang_limit, p.ang_limit)
             return 0.0, w_z, {"note": "SEARCH", "fit": None, "gate": None}
 
+        # find the outline of the marker
         _ret = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         if len(_ret) == 3:
             _img_out, contours, _hier = _ret
@@ -77,6 +87,7 @@ class PipeLineFollower(object):
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
         pts = contours[0].reshape(-1, 2)
 
+        # fit a straight line through the marker to get its angle
         [vx, vy, x0, y0] = cv2.fitLine(pts, cv2.DIST_L2, 0, 0.01, 0.01)
         angle = math.atan2(float(vy), float(vx))
         if angle > math.pi / 2:
@@ -87,12 +98,14 @@ class PipeLineFollower(object):
         if p.invert_ang_error:
             ang_err = -ang_err
 
+        # cut out a narrow vertical window to measure sideways offset
         x_center = int(saturate(p.sensor_x_frac, 0.0, 1.0) * w)
         half_gate = int(0.5 * saturate(p.sensor_width_frac, 0.01, 0.9) * w)
         xs = max(0, x_center - half_gate)
         xe = min(w, x_center + half_gate)
         gate = mask[:, xs:xe]
 
+        # split the window into strips and see how full each one is
         n = max(3, int(p.n_sensors))
         band_h = h // n
         occ = []
@@ -107,6 +120,7 @@ class PipeLineFollower(object):
         occ = np.array(occ, dtype=np.float32)
         centers_y = np.array(centers_y, dtype=np.float32)
 
+        # average the strip positions, weighted by how full each is
         mask_valid = occ >= p.sensor_min_fill
         if np.any(mask_valid):
             y_meas = np.average(centers_y[mask_valid], weights=occ[mask_valid])
@@ -117,13 +131,16 @@ class PipeLineFollower(object):
             else:
                 y_meas = h * 0.5
 
+        # sideways error: -1 to 1, 0 means centered
         y_err = (y_meas - (0.5 * h)) / (0.5 * h)
         if p.invert_y_error:
             y_err = -y_err
 
+        # turn rate combines angle error and sideways error
         w_z = -p.k_ang * ang_err - p.k_y * y_err
         w_z = saturate(w_z, -p.ang_limit, p.ang_limit)
 
+        # go slower the more crooked we are
         speed_scale = 1.0 / (1.0 + p.slowdown_angle * abs(ang_err))
         v_x = saturate(p.v_fwd * speed_scale, p.v_min, p.lin_limit)
 
@@ -138,6 +155,7 @@ class PipeLineFollower(object):
         }
         return v_x, w_z, info
 
+    # Draws the fitted line, window and errors on the mask so you can see what it's doing
     @staticmethod
     def draw_debug(mask, info):
         h, w = mask.shape[:2]
