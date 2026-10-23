@@ -19,7 +19,7 @@ mp4_queue = queue.Queue(maxsize=10)
 stop_event = threading.Event()
 
 zed = sl.Camera()
-
+    
 # Set configuration parameters
 init_params = sl.InitParameters()
 init_params.depth_mode = sl.DEPTH_MODE.ULTRA          # Set depth quality
@@ -88,7 +88,7 @@ exr_thread.start()
 mp4_thread.start()
 
 # Initialize main thread UDP streamer
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 image = sl.Mat()
 depth_image = sl.Mat()
 
@@ -118,14 +118,14 @@ try:
                 exr_queue.put(rgbd_image)
 
             # Handle UDP Streaming instantly (No disk bottlenecks!)
-            stream_frame = cv2.resize(frame, STREAM_SIZE, interpolation=cv2.INTER_AREA)
-            ok, buf = cv2.imencode(".jpg", stream_frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-            if not ok:
-                continue
-            if len(buf) >= 65000:
-                print(f"frame too big: {len(buf)} bytes, dropped")
-                continue
-            sock.sendto(buf.tobytes(), LAPTOP_ADDR)
+            # stream_frame = cv2.resize(frame, STREAM_SIZE, interpolation=cv2.INTER_AREA)
+            # ok, buf = cv2.imencode(".jpg", stream_frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+            # if not ok:
+            #     continue
+            # if len(buf) >= 65000:
+            #     print(f"frame too big: {len(buf)} bytes, dropped")
+            #     continue
+            # sock.sendto(buf.tobytes(), LAPTOP_ADDR)
 
 except KeyboardInterrupt:
     print("\nStopping application and flushing remaining frames to disk...")

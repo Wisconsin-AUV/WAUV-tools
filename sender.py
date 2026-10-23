@@ -30,7 +30,8 @@ try:
             joystick = wait_for_joystick()
             continue
         axes = [round(joystick.get_axis(i), 3) for i in range(joystick.get_numaxes())]
-        sock.sendto(json.dumps({"axes": axes}).encode(), DEST)
+        buttons = [joystick.get_button(i) for i in range(joystick.get_numbuttons())]
+        sock.sendto(json.dumps({"axes": axes, "buttons": buttons}).encode(), DEST)
         clock.tick(50)
 except KeyboardInterrupt:
     sock.close()
